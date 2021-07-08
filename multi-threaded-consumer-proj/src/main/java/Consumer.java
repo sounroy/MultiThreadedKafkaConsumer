@@ -1,3 +1,4 @@
+package com.cyborg;
 
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
@@ -40,15 +41,14 @@ public class Consumer implements Runnable, ConsumerRebalanceListener {
     @Override
     public void run() {
         try {
-           // synchronized (this) {
             consumer.subscribe(Collections.singleton("high-scores"), this);
             while (!stopped.get()) {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.of(100, ChronoUnit.MILLIS));
                 handleFetchedRecords(records);
                 checkActiveTasks();
                 commitOffsets();
-          //  }
             }
+
         } catch (WakeupException we) {
             if (!stopped.get())
                 throw we;
@@ -57,19 +57,20 @@ public class Consumer implements Runnable, ConsumerRebalanceListener {
         }
     }
 
-    // As the consumer runs, three things happen
+    /* As the consumer runs, three things happen
     // 1. Handle the records.The consumer poll, returns records at every poll interval.
     // We can specify max.poll.interval in seconds, max.poll.size too.
     // Pass those records to the handleFetchRecords method which identifies partitions, iterates
-    // each partition creates those many tasks as partitions are unit of tasks from where seqeuntial /
-    // processing can be done by each thread.
-    // also maintains map of activetasks by key as partition , value as the thread task
+    // each partition creates those many tasks as partitions are unit of tasks from where sequential
+    // processing on the data, can be done by each thread.
+    // also maintains map of active tasks by key as partition , value as the thread task.
 
     // Since main thread is not waiting for a task in a partition is completed by a thread,
     // in order to ensure the processing guarantees of a partition in order,
     // once we spin a thread per partition we pause the consumer on that partition so
-    // that in the next poll it does not fetch data from that prtition
-    // and resume that partition when the task has been completed on that partition
+    // that in the next poll it does not fetch data from that partition
+    // and resume that partition when the task has been completed on that partition. */
+
     private void handleFetchedRecords(ConsumerRecords<String, String> records) {
         if (records.count() > 0) {
            /* for (ConsumerRecord<String, String> record : records)
@@ -96,7 +97,7 @@ public class Consumer implements Runnable, ConsumerRebalanceListener {
         try {
             long currentTimeMillis = System.currentTimeMillis();
             if (currentTimeMillis - lastCommitTime > 5000) {
-                if(!offsetsToCommit.isEmpty()) {
+                if (!offsetsToCommit.isEmpty()) {
                     consumer.commitSync(offsetsToCommit);
                     offsetsToCommit.clear();
                 }
@@ -108,10 +109,13 @@ public class Consumer implements Runnable, ConsumerRebalanceListener {
     }
 
     //https://www.confluent.io/blog/kafka-consumer-multi-threaded-messaging/
-   // 2. This is the second task.
+    // 2. This is the second task.
     // Check the activetasks map which is having partition and task,
     // ask and check if each task has completed, if yes remove from activeTask map and get the offset and
-    // add it to the offsetcommit map.
+    // add it to the offsetcommit map, to be committed in next step.
+
+    // Also note that we had in action 1, paused those partitions on which we had assigned a thread.
+    // we would resume those partitions on which tasks have completed.
     private void checkActiveTasks() {
         List<TopicPartition> finishedTasksPartitions = new ArrayList<>();
         activeTasks.forEach((partition, task) -> {
@@ -125,8 +129,11 @@ public class Consumer implements Runnable, ConsumerRebalanceListener {
         consumer.resume(finishedTasksPartitions);
     }
 
-   // Identify the partitions which are subjected to revoke
-    // iterate each partition and wait for the task to complete,
+    // Since partitions affected on revoke, can have either a task assigned or not.
+    // So we need to identify offsets from the task of those partitions, as well as normal offsets
+    // of the other type of partitions.
+    // Identify the partitions which are subjected to revoke
+    // iterate each partition, identify the task, stop it and wait for the task to complete,
     // get the last offset and commit it.
     // also commit offsets for revoked partitions
     @Override
@@ -152,7 +159,7 @@ public class Consumer implements Runnable, ConsumerRebalanceListener {
 
         // 3. collect offsets for revoked partitions
         Map<TopicPartition, OffsetAndMetadata> revokedPartitionOffsets = new HashMap<>();
-        partitions.forEach( partition -> {
+        partitions.forEach(partition -> {
             OffsetAndMetadata offset = offsetsToCommit.remove(partition);
             if (offset != null)
                 revokedPartitionOffsets.put(partition, offset);
@@ -166,13 +173,14 @@ public class Consumer implements Runnable, ConsumerRebalanceListener {
         }
     }
 
-    // consume resume the partitions
+    // consumer resume the partitions
     @Override
     public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
         consumer.resume(partitions);
     }
 
-
+   // To Stop the consumer, main poll thread, raise a wakeup exception.
+    // Also set the atomic boolean variable stopped,which is used to run the poll().
     public void stopConsuming() {
         stopped.set(true);
         consumer.wakeup();

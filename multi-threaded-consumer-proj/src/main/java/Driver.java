@@ -1,7 +1,8 @@
+package  com.cyborg;
+
 public class Driver {
 
     public static void main(String...x) {
-      Consumer c = new Consumer("topic-name");
-
+      com.cyborg.Consumer c = new Consumer("topic-name");
     }
 }
