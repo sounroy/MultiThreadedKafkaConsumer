@@ -9,8 +9,15 @@
     
     #etc.
     
-   
- To Run exeecute
+ To run a kafka broker
+  
+  docker prune
+  docker-compose up
+  
+  To visualize the kafka data 
+    ![image](https://user-images.githubusercontent.com/20036322/124955945-1d09c480-e035-11eb-9ee2-59d55e8d5f17.png)
+
+ To execute
  
  mvn clean install
  
