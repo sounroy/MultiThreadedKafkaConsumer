@@ -24,3 +24,6 @@
  Run the following class
  
  Driver.java
+ 
+ ![image](https://user-images.githubusercontent.com/20036322/124956200-60fcc980-e035-11eb-93c7-ac2c43b8b15b.png)
+
